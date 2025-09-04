@@ -3,6 +3,8 @@ import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+// Using a placeholder for the avatar - user can replace with their uploaded image
 
 export interface Message {
   id: string;
@@ -11,16 +13,26 @@ export interface Message {
   timestamp: Date;
 }
 
+interface UserInfo {
+  name?: string;
+  industry?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  stage: string;
+}
+
 export const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi there! 👋 I'm your AI assistant. How can I help you today?",
+      text: "Hi there! I'm Sky AI from Neo Gold. What's your name?",
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo>({ stage: 'greeting' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -42,31 +54,54 @@ export const ChatInterface = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsTyping(true);
 
-    // Simulate AI response delay
-    setTimeout(() => {
+    try {
+      const { data, error } = await supabase.functions.invoke('chat-with-ai', {
+        body: {
+          message: text,
+          conversationHistory: messages,
+          userInfo: userInfo
+        }
+      });
+
+      if (error) {
+        console.error('Error calling AI function:', error);
+        throw error;
+      }
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Thanks for your message! This is where the GPT integration would respond. To enable real AI responses, you'll need to connect to Supabase for backend functionality.",
+        text: data.response,
         isUser: false,
         timestamp: new Date(),
       };
       
       setMessages(prev => [...prev, aiMessage]);
+      setUserInfo(data.userInfo);
       setIsTyping(false);
-    }, 1000 + Math.random() * 2000);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "I'm having trouble connecting right now. Please try again in a moment!",
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsTyping(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-chat-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-2xl overflow-hidden">
+      <div className="w-full max-w-lg bg-white rounded-lg shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="bg-primary px-4 py-3 flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-            <MessageCircle className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 bg-white/20 flex items-center justify-center">
+            <span className="text-white font-bold text-lg">S</span>
           </div>
           <div>
-            <h1 className="text-white font-semibold">AI Assistant</h1>
-            <p className="text-white/80 text-sm">Online</p>
+            <h1 className="text-white font-semibold">Sky AI</h1>
+            <p className="text-white/80 text-sm">Online 24/7</p>
           </div>
         </div>
 

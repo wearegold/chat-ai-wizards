@@ -18,7 +18,7 @@ All colors MUST be HSL.
     --popover-foreground: 222.2 84% 4.9%;
 
     /* WhatsApp-inspired color scheme */
-    --primary: 142 70% 49%; /* WhatsApp green */
+    --primary: 142 70% 37%; /* Darker WhatsApp green */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
@@ -27,7 +27,7 @@ All colors MUST be HSL.
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 142 70% 49%;
+    --accent: 142 70% 37%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
@@ -35,11 +35,11 @@ All colors MUST be HSL.
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 142 70% 49%;
+    --ring: 142 70% 37%;
 
     /* Chat-specific colors */
     --chat-background: 0 0% 95%;
-    --chat-user-bubble: 142 70% 49%;
+    --chat-user-bubble: 142 70% 37%;
     --chat-ai-bubble: 0 0% 100%;
     --chat-user-text: 0 0% 100%;
     --chat-ai-text: 222.2 84% 4.9%;
