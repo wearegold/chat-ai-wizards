@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          created_at: string
+          date: string
+          description: string | null
+          end_time: string
+          id: string
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          description?: string | null
+          end_time: string
+          id?: string
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string | null
+          end_time?: string
+          id?: string
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       demo_leads: {
         Row: {
           created_at: string
@@ -46,6 +79,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      leads: {
+        Row: {
+          appointment_id: string | null
+          conversation_history: Json
+          created_at: string
+          email: string | null
+          id: string
+          industry: string | null
+          name: string | null
+          phone: string | null
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          conversation_history?: Json
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          name?: string | null
+          phone?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          conversation_history?: Json
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          name?: string | null
+          phone?: string | null
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

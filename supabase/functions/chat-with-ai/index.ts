@@ -1,15 +1,21 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Initialize Supabase client
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+
 // Conversation stages
-type ConversationStage = 'greeting' | 'asking_name' | 'industry' | 'pain_points' | 'explaining' | 'collecting_phone' | 'collecting_email' | 'collecting_name' | 'collecting_city' | 'booking' | 'confirmed';
+type ConversationStage = 'industry' | 'asking_name' | 'pain_points' | 'explaining' | 'collecting_phone' | 'collecting_email' | 'collecting_name' | 'collecting_city' | 'booking' | 'confirmed';
 
 interface UserInfo {
   name?: string;
@@ -18,6 +24,7 @@ interface UserInfo {
   phone?: string;
   city?: string;
   stage: ConversationStage;
+  leadId?: string;
 }
 
 serve(async (req) => {
@@ -26,14 +33,17 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationHistory = [], userInfo = { stage: 'greeting' } } = await req.json();
+    const { message, conversationHistory = [], userInfo = { stage: 'industry' } } = await req.json();
 
     console.log('Received message:', message);
     console.log('Current stage:', userInfo.stage);
     console.log('User info:', userInfo);
 
+    // Save/update lead in database
+    const updatedUserInfo = await saveOrUpdateLead(userInfo, message, conversationHistory);
+
     // Build the system prompt based on current stage and user info
-    const systemPrompt = buildSystemPrompt(userInfo, conversationHistory);
+    const systemPrompt = buildSystemPrompt(updatedUserInfo, conversationHistory);
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -71,15 +81,18 @@ serve(async (req) => {
     const splitMessages = splitLongMessage(aiResponse);
 
     // Update user info and stage based on the conversation
-    const updatedUserInfo = updateUserInfo(userInfo, message, aiResponse);
+    const finalUserInfo = updateUserInfo(updatedUserInfo, message, aiResponse);
+
+    // Update lead in database with final info
+    await updateLeadConversation(finalUserInfo, conversationHistory, message, aiResponse);
 
     console.log('AI Response:', aiResponse);
     console.log('Split into', splitMessages.length, 'messages');
-    console.log('Updated user info:', updatedUserInfo);
+    console.log('Updated user info:', finalUserInfo);
 
     return new Response(JSON.stringify({ 
       response: splitMessages.length > 1 ? splitMessages : aiResponse,
-      userInfo: updatedUserInfo 
+      userInfo: finalUserInfo 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -91,6 +104,150 @@ serve(async (req) => {
     });
   }
 });
+
+async function saveOrUpdateLead(userInfo: UserInfo, message: string, conversationHistory: any[]): Promise<UserInfo> {
+  try {
+    // Extract info from current stage
+    const updatedInfo = { ...userInfo };
+    const lowerMessage = message.toLowerCase();
+
+    // Update stage-specific information
+    switch (userInfo.stage) {
+      case 'industry':
+        updatedInfo.industry = message.trim();
+        updatedInfo.stage = 'asking_name';
+        break;
+      case 'asking_name':
+        updatedInfo.name = message.trim();
+        updatedInfo.stage = 'pain_points';
+        break;
+      case 'collecting_phone':
+        const phoneMatch = message.match(/[\d\s\-\(\)\+]+/);
+        if (phoneMatch) {
+          updatedInfo.phone = phoneMatch[0].trim();
+          updatedInfo.stage = 'collecting_email';
+        }
+        break;
+      case 'collecting_email':
+        const emailMatch = message.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+        if (emailMatch) {
+          updatedInfo.email = emailMatch[0];
+          updatedInfo.stage = 'collecting_name';
+        }
+        break;
+      case 'collecting_name':
+        if (!updatedInfo.name) {
+          updatedInfo.name = message.trim();
+        }
+        updatedInfo.stage = 'collecting_city';
+        break;
+      case 'collecting_city':
+        updatedInfo.city = message.trim();
+        updatedInfo.stage = 'booking';
+        break;
+    }
+
+    // Save lead if we have at least email or phone
+    if ((updatedInfo.email || updatedInfo.phone) && !updatedInfo.leadId) {
+      const { data, error } = await supabase
+        .from('leads')
+        .insert({
+          name: updatedInfo.name,
+          email: updatedInfo.email,
+          phone: updatedInfo.phone,
+          industry: updatedInfo.industry,
+          stage: updatedInfo.stage,
+          conversation_history: conversationHistory
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating lead:', error);
+      } else {
+        updatedInfo.leadId = data.id;
+        console.log('Created lead with ID:', data.id);
+      }
+    } else if (updatedInfo.leadId) {
+      // Update existing lead
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          name: updatedInfo.name,
+          email: updatedInfo.email,
+          phone: updatedInfo.phone,
+          industry: updatedInfo.industry,
+          stage: updatedInfo.stage,
+          conversation_history: conversationHistory
+        })
+        .eq('id', updatedInfo.leadId);
+
+      if (error) {
+        console.error('Error updating lead:', error);
+      }
+    }
+
+    return updatedInfo;
+  } catch (error) {
+    console.error('Error in saveOrUpdateLead:', error);
+    return userInfo;
+  }
+}
+
+async function updateLeadConversation(userInfo: UserInfo, conversationHistory: any[], userMessage: string, aiResponse: string) {
+  if (!userInfo.leadId) return;
+
+  try {
+    const updatedHistory = [
+      ...conversationHistory,
+      { text: userMessage, isUser: true, timestamp: new Date() },
+      { text: aiResponse, isUser: false, timestamp: new Date() }
+    ];
+
+    await supabase
+      .from('leads')
+      .update({
+        conversation_history: updatedHistory,
+        stage: userInfo.stage
+      })
+      .eq('id', userInfo.leadId);
+  } catch (error) {
+    console.error('Error updating conversation history:', error);
+  }
+}
+
+async function checkAvailableSlots(date: string): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('start_time, end_time')
+      .eq('date', date);
+
+    if (error) {
+      console.error('Error checking appointments:', error);
+      return ['10:30am', '2:00pm', '4:30pm']; // Fallback times
+    }
+
+    // Get booked times
+    const bookedTimes = data?.map(apt => apt.start_time) || [];
+    
+    // Available slots (simplified)
+    const allSlots = ['09:00', '10:30', '14:00', '16:30'];
+    const availableSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
+    
+    // Convert to display format
+    return availableSlots.map(slot => {
+      const [hour, minute] = slot.split(':');
+      const hourNum = parseInt(hour);
+      const ampm = hourNum >= 12 ? 'pm' : 'am';
+      const displayHour = hourNum > 12 ? hourNum - 12 : hourNum;
+      return `${displayHour}:${minute}${ampm}`;
+    }).slice(0, 3);
+  } catch (error) {
+    console.error('Error in checkAvailableSlots:', error);
+    return ['10:30am', '2:00pm', '4:30pm'];
+  }
+}
 
 function buildSystemPrompt(userInfo: UserInfo, conversationHistory: any[]): string {
   const basePrompt = `You are Sky AI from Neo Gold, a friendly professional receptionist sales assistant.

@@ -4,7 +4,6 @@ import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-// Using a placeholder for the avatar - user can replace with their uploaded image
 
 export interface Message {
   id: string;
@@ -21,19 +20,20 @@ interface UserInfo {
   phone?: string;
   city?: string;
   stage: string;
+  leadId?: string;
 }
 
 export const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi there! I'm Sky AI from Neo Gold. What's your name?",
+      text: "Hi there! I'm Sky AI from Neo Gold. Which industry are you in?",
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
-  const [userInfo, setUserInfo] = useState<UserInfo>({ stage: 'greeting' });
+  const [userInfo, setUserInfo] = useState<UserInfo>({ stage: 'industry' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -59,7 +59,7 @@ export const ChatInterface = () => {
       const { data, error } = await supabase.functions.invoke('chat-with-ai', {
         body: {
           message: text,
-          conversationHistory: messages,
+          conversationHistory: [...messages, userMessage],
           userInfo: userInfo
         }
       });
@@ -120,8 +120,8 @@ export const ChatInterface = () => {
   };
 
   return (
-    <div className="min-h-screen bg-chat-background flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-white rounded-none shadow-2xl overflow-hidden" style={{ height: '90vh' }}>
+    <div className="h-screen bg-chat-background overflow-hidden">
+      <div className="w-full h-full bg-white flex flex-col">
         {/* WhatsApp-style Header */}
         <div className="bg-chat-header px-4 py-3 flex items-center gap-3 border-b">
           <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-300">
@@ -141,7 +141,6 @@ export const ChatInterface = () => {
         <div 
           className="flex-1 overflow-y-auto p-4 space-y-2 bg-chat-background"
           style={{ 
-            height: 'calc(90vh - 120px)',
             backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 100 100\'%3E%3Cg fill-opacity=\'0.03\'%3E%3Cpolygon fill=\'%23000\' points=\'50 0 60 40 100 50 60 60 50 100 40 60 0 50 40 40\'/%3E%3C/g%3E%3C/svg%3E")'
           }}
         >
