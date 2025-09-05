@@ -16,23 +16,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   };
 
   return (
-    <div className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-1`}>
       <div
         className={`
-          max-w-[85%] px-3 py-2 rounded-2xl relative transition-all duration-200 hover:scale-[1.02]
+          max-w-[70%] px-3 py-2 relative shadow-sm
           ${message.isUser
-            ? 'bg-chat-user-bubble text-chat-user-text rounded-br-sm'
-            : 'bg-chat-ai-bubble text-chat-ai-text border border-border/50 rounded-bl-sm'
+            ? 'bg-chat-user-bubble text-chat-user-text rounded-lg rounded-br-md'
+            : 'bg-chat-ai-bubble text-chat-ai-text rounded-lg rounded-bl-md'
           }
         `}
       >
-        <p className="text-sm leading-relaxed break-words">{message.text}</p>
+        <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{message.text}</p>
         <div className={`flex items-center gap-1 mt-1 ${message.isUser ? 'justify-end' : 'justify-start'}`}>
-          <span className={`text-xs ${message.isUser ? 'text-white/70' : 'text-muted-foreground'}`}>
+          <span className={`text-xs ${message.isUser ? 'text-white/70' : 'text-gray-500'}`}>
             {formatTime(message.timestamp)}
           </span>
           {message.isUser && (
-            <CheckCheck className="w-3 h-3 text-white/70" />
+            <div className="flex">
+              {message.isRead ? (
+                <CheckCheck className="w-3 h-3 text-blue-400" />
+              ) : (
+                <CheckCheck className="w-3 h-3 text-white/50" />
+              )}
+            </div>
           )}
         </div>
       </div>

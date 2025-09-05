@@ -57,7 +57,9 @@ export default {
 					'user-bubble': 'hsl(var(--chat-user-bubble))',
 					'ai-bubble': 'hsl(var(--chat-ai-bubble))',
 					'user-text': 'hsl(var(--chat-user-text))',
-					'ai-text': 'hsl(var(--chat-ai-text))'
+					'ai-text': 'hsl(var(--chat-ai-text))',
+					'header': 'hsl(var(--chat-header))',
+					'input-bg': 'hsl(var(--chat-input-bg))'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',

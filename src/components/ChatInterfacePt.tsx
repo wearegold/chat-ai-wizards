@@ -4,7 +4,6 @@ import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-// Using a placeholder for the avatar - user can replace with their uploaded image
 
 export interface Message {
   id: string;
@@ -23,11 +22,11 @@ interface UserInfo {
   stage: string;
 }
 
-export const ChatInterface = () => {
+export const ChatInterfacePt = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi there! I'm Sky AI from Neo Gold. What's your name?",
+      text: "Olá! Eu sou a Sky AI da Neo Gold. Qual é o seu nome?",
       isUser: false,
       timestamp: new Date(),
     },
@@ -56,7 +55,7 @@ export const ChatInterface = () => {
     setIsTyping(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('chat-with-ai', {
+      const { data, error } = await supabase.functions.invoke('chat-with-ai-pt', {
         body: {
           message: text,
           conversationHistory: messages,
@@ -110,7 +109,7 @@ export const ChatInterface = () => {
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "I'm having trouble connecting right now. Please try again in a moment!",
+        text: "Estou com problemas de conexão agora. Tente novamente em um momento!",
         isUser: false,
         timestamp: new Date(),
       };

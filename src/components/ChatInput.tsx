@@ -25,19 +25,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
   };
 
   return (
-    <div className="border-t border-border bg-white p-3">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+    <div className="border-t border-gray-200 bg-chat-input-bg p-3">
+      <form onSubmit={handleSubmit} className="flex items-end gap-3">
         <div className="flex-1 relative">
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            className="w-full resize-none rounded-full px-4 py-2 bg-muted border-0 outline-none focus:ring-2 focus:ring-primary/20 max-h-20 min-h-[40px] transition-all duration-200"
+            placeholder="Type a message"
+            className="w-full resize-none rounded-3xl px-4 py-3 bg-gray-100 border-0 outline-none focus:ring-0 max-h-20 min-h-[48px] transition-all duration-200 text-sm"
             rows={1}
             style={{
               height: 'auto',
-              minHeight: '40px',
+              minHeight: '48px',
             }}
             onInput={(e) => {
               const target = e.target as HTMLTextAreaElement;
@@ -49,10 +49,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
         <Button
           type="submit"
           size="sm"
-          className="rounded-full h-10 w-10 p-0 bg-primary hover:bg-primary/90 transition-all duration-200 hover:scale-105 self-end"
+          className="rounded-full h-12 w-12 p-0 bg-primary hover:bg-primary/90 transition-all duration-200 hover:scale-105"
           disabled={!message.trim()}
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-5 h-5" />
         </Button>
       </form>
     </div>
