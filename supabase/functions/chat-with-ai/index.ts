@@ -15,7 +15,7 @@ const corsHeaders = {
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
 // Conversation stages
-type ConversationStage = 'industry' | 'asking_name' | 'pain_points' | 'explaining' | 'collecting_phone' | 'collecting_email' | 'collecting_name' | 'collecting_city' | 'booking' | 'confirmed';
+type ConversationStage = 'greeting' | 'asking_name' | 'industry' | 'explaining' | 'pitch_call' | 'collecting_name' | 'collecting_email' | 'collecting_phone' | 'collecting_city' | 'booking' | 'confirmed';
 
 interface UserInfo {
   name?: string;
@@ -25,6 +25,10 @@ interface UserInfo {
   city?: string;
   stage: ConversationStage;
   leadId?: string;
+  // Scheduling helpers (not persisted):
+  proposedSlots?: string[];
+  proposedDateLabel?: string;
+  appointmentLabel?: string;
 }
 
 serve(async (req) => {
@@ -33,7 +37,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationHistory = [], userInfo = { stage: 'industry' } } = await req.json();
+    const { message, conversationHistory = [], userInfo = { stage: 'greeting' } } = await req.json();
 
     console.log('Received message:', message);
     console.log('Current stage:', userInfo.stage);
@@ -42,8 +46,16 @@ serve(async (req) => {
     // Save/update lead in database
     const updatedUserInfo = await saveOrUpdateLead(userInfo, message, conversationHistory);
 
+    // Enrich with proposed booking slots when reaching booking stage
+    const enrichedUserInfo: UserInfo = { ...updatedUserInfo };
+    if (enrichedUserInfo.stage === 'booking' && !enrichedUserInfo.proposedSlots) {
+      const { dateLabel, slots } = generateBookingOptions(enrichedUserInfo.city);
+      enrichedUserInfo.proposedSlots = slots;
+      enrichedUserInfo.proposedDateLabel = dateLabel;
+    }
+
     // Build the system prompt based on current stage and user info
-    const systemPrompt = buildSystemPrompt(updatedUserInfo, conversationHistory);
+    const systemPrompt = buildSystemPrompt(enrichedUserInfo, conversationHistory);
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -81,7 +93,7 @@ serve(async (req) => {
     const splitMessages = splitLongMessage(aiResponse);
 
     // Update user info and stage based on the conversation
-    const finalUserInfo = updateUserInfo(updatedUserInfo, message, aiResponse);
+    const finalUserInfo = updateUserInfo(enrichedUserInfo, message, aiResponse);
 
     // Update lead in database with final info
     await updateLeadConversation(finalUserInfo, conversationHistory, message, aiResponse);
