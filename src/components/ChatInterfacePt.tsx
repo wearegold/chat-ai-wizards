@@ -4,6 +4,7 @@ import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 
 export interface Message {
   id: string;
@@ -33,6 +34,8 @@ export const ChatInterfacePt = () => {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo>({ stage: 'greeting' });
+  const [showBookedModal, setShowBookedModal] = useState(false);
+  const [appointmentLabel, setAppointmentLabel] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -42,6 +45,18 @@ export const ChatInterfacePt = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping]);
+
+  // Show non-closable booking confirmation 6s after confirmation
+  useEffect(() => {
+    if (userInfo?.stage === 'confirmed' && (userInfo as any).appointmentLabel) {
+      const label = (userInfo as any).appointmentLabel as string;
+      const timer = setTimeout(() => {
+        setAppointmentLabel(label);
+        setShowBookedModal(true);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [userInfo]);
 
   const handleSendMessage = async (text: string) => {
     const userMessage: Message = {
@@ -152,6 +167,18 @@ export const ChatInterfacePt = () => {
 
         {/* WhatsApp-style Input Area */}
         <ChatInput onSendMessage={handleSendMessage} />
+
+        {/* Non-closable booking confirmation modal */}
+        <Dialog open={showBookedModal} onOpenChange={() => setShowBookedModal(true)}>
+          <DialogContent className="sm:max-w-md select-none">
+            <DialogHeader>
+              <DialogTitle>Chamada agendada</DialogTitle>
+              <DialogDescription>
+                Sua conversa com nosso time está confirmada para {appointmentLabel}. Enviaremos um email de confirmação em instantes. Até breve!
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

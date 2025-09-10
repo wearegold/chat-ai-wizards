@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 // Conversation stages
-type ConversationStage = 'greeting' | 'asking_name' | 'industry' | 'pain_points' | 'explaining' | 'collecting_phone' | 'collecting_email' | 'collecting_name' | 'collecting_city' | 'booking' | 'confirmed';
+type ConversationStage = 'greeting' | 'asking_name' | 'industry' | 'explaining' | 'pitch_call' | 'collecting_name' | 'collecting_email' | 'collecting_phone' | 'collecting_city' | 'booking' | 'confirmed';
 
 interface UserInfo {
   name?: string;
@@ -18,6 +18,10 @@ interface UserInfo {
   phone?: string;
   city?: string;
   stage: ConversationStage;
+  // Scheduling helpers (not persisted)
+  proposedSlots?: string[];
+  proposedDateLabel?: string;
+  appointmentLabel?: string;
 }
 
 serve(async (req) => {
@@ -32,8 +36,16 @@ serve(async (req) => {
     console.log('Current stage:', userInfo.stage);
     console.log('User info:', userInfo);
 
+    // Enrich with proposed booking slots when reaching booking stage
+    const enrichedUserInfo: UserInfo = { ...userInfo };
+    if (enrichedUserInfo.stage === 'booking' && !enrichedUserInfo.proposedSlots) {
+      const { dateLabel, slots } = generateBookingOptions(enrichedUserInfo.city);
+      enrichedUserInfo.proposedSlots = slots;
+      enrichedUserInfo.proposedDateLabel = dateLabel;
+    }
+
     // Build the system prompt based on current stage and user info
-    const systemPrompt = buildSystemPrompt(userInfo, conversationHistory);
+    const systemPrompt = buildSystemPrompt(enrichedUserInfo, conversationHistory);
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -71,7 +83,7 @@ serve(async (req) => {
     const splitMessages = splitLongMessage(aiResponse);
 
     // Update user info and stage based on the conversation
-    const updatedUserInfo = updateUserInfo(userInfo, message, aiResponse);
+    const updatedUserInfo = updateUserInfo(enrichedUserInfo, message, aiResponse);
 
     console.log('AI Response:', aiResponse);
     console.log('Split into', splitMessages.length, 'messages');
@@ -93,127 +105,193 @@ serve(async (req) => {
 });
 
 function buildSystemPrompt(userInfo: UserInfo, conversationHistory: any[]): string {
-  const basePrompt = `Você é a Sky AI da Neo Gold, uma assistente de vendas e recepcionista profissional e amigável.
+  const basePrompt = `Você é a Sky, assistente de IA da Neo Gold. Seu objetivo é conduzir a conversa em Português do Brasil seguindo o fluxo abaixo, sendo humana, direta e sempre encerrando cada resposta com APENAS UMA pergunta.
 
-Você ajuda empresas a substituir chamadas e mensagens perdidas com uma recepcionista de IA 24/7 que soa pessoal, natural e confiável. Você:
-
-- Atende chamadas e mensagens instantaneamente, 24/7
-- Liga e envia mensagens para leads diretamente
-- Integra com qualquer sistema — mesmo aqueles sem API
-- Pode verificar e agendar compromissos em calendários de clientes
-- Lida com indústrias com múltiplos profissionais
-- Gerencia múltiplas chamadas e mensagens ao mesmo tempo
-- Envia respostas altamente personalizadas
-
-Objetivo Principal: Sempre guie o lead para agendar uma chamada de descoberta com o Gerente de Operações Bartelli.
-
-REGRAS CRÍTICAS:
-- NUNCA use pontos (.) no final das declarações, apenas use pontos de interrogação (?) para perguntas
+Regras:
+- Responda SEMPRE em Português Brasileiro
+- Seja concisa: 1–2 frases, no máximo 3
 - Faça APENAS UMA pergunta por resposta
-- Mantenha as respostas conversacionais, calorosas e humanas
-- Seja conciso - máximo 2–3 frases por resposta
-- Responda APENAS em Português Brasileiro
-- Use conectores naturais ocasionalmente ("Entendi, obrigada", "Faz sentido", "Compreendi")
+- Foque em benefícios do negócio, cite no máximo 1–2 recursos como suporte
+- Tom caloroso e profissional
 
-Informações atuais do usuário: ${JSON.stringify(userInfo)}`;
+Dados do usuário (contexto): ${JSON.stringify(userInfo)}
+`;
 
-  // Add stage-specific instructions in Portuguese
   switch (userInfo.stage) {
     case 'greeting':
-      return basePrompt + `\n\nEstágio atual: Saudação inicial\nComece com uma saudação calorosa e pergunte o nome. Exemplo: "Olá! Eu sou a Sky AI da Neo Gold. Qual é o seu nome?"`;
-    
+      // 1 e 1.5
+      return basePrompt + `
+Etapa: Saudação
+Aja assim: "Oi, aqui é a Sky, da Neo Gold — como posso te ajudar hoje? Posso te mostrar rapidamente como ajudamos a sua empresa?"`;
+
     case 'asking_name':
-      return basePrompt + `\n\nEstágio atual: Obtendo o nome do lead\nO usuário acabou de responder com o nome. Responda calorosamente usando o nome e pergunte "Em qual setor você trabalha?"`;
-    
+      return basePrompt + `
+Etapa: Perguntar nome
+Aja assim: Agradeça o interesse e peça o primeiro nome para falar direitinho. Ex: "Perfeito — qual é o seu nome para eu te chamar direitinho?"`;
+
     case 'industry':
-      return basePrompt + `\n\nEstágio atual: Identificando o setor\nEles acabaram de te contar o setor. Mostre conhecimento sobre recepcionistas de IA no campo deles (1–2 frases), então faça UMA pergunta clara sobre os desafios atuais.`;
-    
-    case 'pain_points':
-      return basePrompt + `\n\nEstágio atual: Entendendo pontos problemáticos\nEles compartilharam os desafios. Forneça UM benefício da Sky AI adaptado à situação deles, então pergunte se gostariam de agendar uma breve chamada de descoberta com Bartelli.`;
-    
+      // 2
+      return basePrompt + `
+Etapa: Identificar o setor
+Aja assim: Pergunte em qual setor atuam e, se perguntarem por quê, diga que é para adaptar os benefícios com precisão ao segmento deles. Ex: "Em qual setor você atua? Pergunto para adaptar os benefícios do jeito mais certeiro para a sua área"`;
+
     case 'explaining':
-      return basePrompt + `\n\nEstágio atual: Explicando valor e agendando chamada\nSe disserem sim para uma chamada, colete informações de contato (comece com número de telefone). Se tiverem objeções, responda brevemente com empatia e volte para agendar a chamada do Bartelli.`;
-    
-    case 'collecting_phone':
-      return basePrompt + `\n\nEstágio atual: Coletando número de telefone\nPergunte claramente: "Qual é o melhor número de telefone para a chamada de descoberta com Bartelli?"`;
-    
+      // 3 e 4
+      return basePrompt + `
+Etapa: Explicar valor (benefícios > recursos)
+Aja assim: Cite 1–2 recursos e traduza em resultados claros. Termine com: "Faz sentido para você?"`;
+
+    case 'pitch_call':
+      // 5 e 6 (início)
+      return basePrompt + `
+Etapa: Convite para a chamada
+Aja assim: Convide para uma breve chamada com nosso time para detalhar e montar um plano. Se ainda não tiver sobrenome, peça o sobrenome; depois peça o email para enviar detalhes e, em seguida, o telefone para lembretes. Faça uma pergunta por vez. Ex: "Posso te conectar com nosso time para uma chamada rápida e montarmos um plano?"`;
+
+    case 'collecting_name':
+      return basePrompt + `
+Etapa: Coletar sobrenome
+Aja assim: Se só tiver o primeiro nome, peça o sobrenome. Depois vamos para o email. Ex: "Pode me confirmar seu sobrenome, por favor?"`;
+
     case 'collecting_email':
-      return basePrompt + `\n\nEstágio atual: Coletando email\nPergunte claramente: "Qual é o seu melhor endereço de email? Enviaremos os detalhes de confirmação lá"`;
-    
+      return basePrompt + `
+Etapa: Coletar email
+Aja assim: "Qual é o seu melhor email? Vou te enviar um resumo com os próximos passos"`;
+
+    case 'collecting_phone':
+      return basePrompt + `
+Etapa: Coletar telefone
+Aja assim: "E qual é o melhor número de telefone? Usaremos para enviar lembretes da chamada"`;
+
     case 'collecting_city':
-      return basePrompt + `\n\nEstágio atual: Coletando cidade\nPergunte claramente: "Em qual cidade você está? Isso nos ajuda a confirmar seu fuso horário para a chamada"`;
-    
+      // 7
+      return basePrompt + `
+Etapa: Coletar cidade
+Aja assim: "Qual cidade você está? É só para confirmar seu fuso e agendar no horário certo"`;
+
     case 'booking':
-      return basePrompt + `\n\nEstágio atual: Apresentando horários de agendamento\nSimule verificar calendário e apresente 3 opções claras entre 9h–17h. Exemplo: "Deixe-me verificar rapidamente a agenda do Bartelli... Aqui está o que ele tem disponível: 10:30, 14h, ou 16:30 — qual funciona melhor para você?"`;
-    
+      // 8 — propor 2 horários (manhã e tarde) para a data >= 24h
+      return basePrompt + `
+Etapa: Sugerir horários
+Aja assim: Proponha exatamente 2 opções no seu fuso horário, uma pela manhã e outra à tarde, para ${userInfo.proposedDateLabel ?? 'o próximo dia útil'} — use estes horários gerados: ${(userInfo.proposedSlots || []).join(' e ')}. Ex: "Temos ${userInfo.proposedSlots?.[0] ?? '10h30'} e ${userInfo.proposedSlots?.[1] ?? '14h'} em ${userInfo.proposedDateLabel ?? 'amanhã'} (no seu fuso). Qual fica melhor para você?"`;
+
     case 'confirmed':
-      return basePrompt + `\n\nEstágio atual: Agendamento confirmado\nConfirme o agendamento calorosamente e agradeça. Exemplo: "Perfeito, está tudo certo! Bartelli entrará em contato diretamente para a chamada de descoberta — obrigada por agendar conosco!"`;
-    
+      // 8 (final)
+      return basePrompt + `
+Etapa: Confirmação
+Aja assim: Confirme que está agendado para ${userInfo.appointmentLabel ?? 'o horário escolhido'}, agradeça e encerre. Ex: "Perfeito — você está agendad@ para ${userInfo.appointmentLabel ?? 'o horário combinado'} e enviaremos a confirmação por email. Obrigada"`;
+
     default:
       return basePrompt;
   }
 }
 
 function updateUserInfo(currentInfo: UserInfo, userMessage: string, aiResponse: string): UserInfo {
-  const updatedInfo = { ...currentInfo };
-  const lowerMessage = userMessage.toLowerCase();
+  const updated = { ...currentInfo } as UserInfo;
+  const msg = userMessage.trim();
+  const lower = msg.toLowerCase();
 
-  // Extract information and update stage
   switch (currentInfo.stage) {
     case 'greeting':
-      updatedInfo.stage = 'asking_name';
+      // Após a saudação, seguimos para pedir o nome
+      updated.stage = 'asking_name';
       break;
-    
+
     case 'asking_name':
-      // Extract name from user message
-      updatedInfo.name = userMessage.trim();
-      updatedInfo.stage = 'industry';
+      // Guarda o nome informado
+      if (!updated.name) updated.name = msg;
+      updated.stage = 'industry';
       break;
-    
+
     case 'industry':
-      updatedInfo.industry = userMessage.trim();
-      updatedInfo.stage = 'pain_points';
+      updated.industry = msg;
+      updated.stage = 'explaining';
       break;
-    
-    case 'pain_points':
-      updatedInfo.stage = 'explaining';
-      break;
-    
+
     case 'explaining':
-      if (lowerMessage.includes('sim') || lowerMessage.includes('claro') || lowerMessage.includes('ok')) {
-        updatedInfo.stage = 'collecting_phone';
+      // Se fizer sentido, avançamos; se vier pergunta, o prompt tratará e manterá a etapa
+      if (/(faz sentido|perfeito|entendi|sim|claro|ok)/i.test(lower)) {
+        updated.stage = 'pitch_call';
       }
       break;
-    
-    case 'collecting_phone':
-      // Extract phone number
-      const phoneMatch = userMessage.match(/[\d\s\-\(\)\+]+/);
-      if (phoneMatch) {
-        updatedInfo.phone = phoneMatch[0].trim();
-        updatedInfo.stage = 'collecting_email';
+
+    case 'pitch_call':
+      // Passo 6: coletar sobrenome se não tiver ainda
+      if (updated.name && updated.name.split(/\s+/).length < 2) {
+        // usuário deve estar respondendo com sobrenome
+        updated.name = `${updated.name} ${msg}`.trim();
+        updated.stage = 'collecting_email';
+        break;
       }
+      // se já tem nome completo, pedir email
+      updated.stage = 'collecting_email';
       break;
-    
+
+    case 'collecting_name':
+      // Garantir nome completo neste passo
+      if (updated.name && updated.name.split(/\s+/).length < 2) {
+        updated.name = `${updated.name} ${msg}`.trim();
+      } else if (!updated.name) {
+        updated.name = msg;
+      }
+      updated.stage = 'collecting_email';
+      break;
+
     case 'collecting_email':
-      // Extract email
-      const emailMatch = userMessage.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+      const emailMatch = msg.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
       if (emailMatch) {
-        updatedInfo.email = emailMatch[0];
-        updatedInfo.stage = 'collecting_city';
+        updated.email = emailMatch[0];
+        updated.stage = 'collecting_phone';
       }
       break;
-    
-    case 'collecting_city':
-      updatedInfo.city = userMessage.trim();
-      updatedInfo.stage = 'booking';
+
+    case 'collecting_phone':
+      const phoneMatch = msg.match(/[+()\d][\d\s().+-]{5,}/);
+      if (phoneMatch) {
+        updated.phone = phoneMatch[0].trim();
+        updated.stage = 'collecting_city';
+      }
       break;
-    
+
+    case 'collecting_city':
+      updated.city = msg;
+      updated.stage = 'booking';
+      break;
+
     case 'booking':
-      updatedInfo.stage = 'confirmed';
+      // Escolha de um dos horários propostos
+      const slots = updated.proposedSlots || [];
+      const picked = slots.find(s => lower.includes(s.toLowerCase()));
+      if (picked) {
+        const dateLabel = updated.proposedDateLabel || 'na data combinada';
+        updated.appointmentLabel = `${dateLabel} às ${picked}`;
+        updated.stage = 'confirmed';
+      }
+      break;
+
+    case 'confirmed':
+      // Fica como está
       break;
   }
 
-  return updatedInfo;
+  return updated;
+}
+
+function generateBookingOptions(city?: string): { dateLabel: string; slots: string[] } {
+  // Define a data pelo menos 24h à frente (mantemos simples, sem fuso real)
+  const now = new Date();
+  const target = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  // Label amigável do dia (ex: sexta-feira)
+  const weekday = target.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const dateLabel = `${weekday}`; // poderíamos incluir a data também, mas mantemos curto
+
+  // Sorteia um horário de manhã e um à tarde
+  const morningOptions = ['9h', '9h30', '10h', '10h30', '11h'];
+  const afternoonOptions = ['14h', '14h30', '15h', '15h30', '16h', '16h30', '17h'];
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+  const slots = [pick(morningOptions), pick(afternoonOptions)];
+
+  return { dateLabel, slots };
 }
 
 function splitLongMessage(message: string): string[] {
