@@ -27,13 +27,19 @@ export const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi there! I'm Sky AI from Neo Gold. Which industry are you in?",
+      text: "Hi, this is Sky from Neo Gold—how can I help you today?",
+      isUser: false,
+      timestamp: new Date(),
+    },
+    {
+      id: '2',
+      text: "Would you like to see how we can help your company?",
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
-  const [userInfo, setUserInfo] = useState<UserInfo>({ stage: 'industry' });
+  const [userInfo, setUserInfo] = useState<UserInfo>({ stage: 'greeting' });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
