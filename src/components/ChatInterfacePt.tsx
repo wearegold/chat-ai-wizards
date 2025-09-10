@@ -27,7 +27,7 @@ export const ChatInterfacePt = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Olá! Eu sou a Sky AI da Neo Gold. Qual é o seu nome?",
+      text: "Oi, aqui é a Sky, da Neo Gold — como posso te ajudar hoje? Posso te mostrar rapidamente como ajudamos a sua empresa?",
       isUser: false,
       timestamp: new Date(),
     },
