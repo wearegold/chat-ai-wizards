@@ -27,13 +27,13 @@ export const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: "Hi, this is Sky from Neo Gold—how can I help you today?",
+      text: "Hi, this is Sky from Neo Gold, would you like to see how we can help your company?",
       isUser: false,
       timestamp: new Date(),
     },
     {
       id: '2',
-      text: "Would you like to see how we can help your company?",
+      text: "Or do you have a specific question about how we work?",
       isUser: false,
       timestamp: new Date(),
     },
